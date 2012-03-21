@@ -356,7 +356,6 @@ public class DAGstructure {
 		DAGnode currentNode;
 		DAGnode [] children;
 		HashSet<Integer> childrenAnnotations = new HashSet<Integer>();
-		int counter=0;
 		int totalChildAnnotations=0;
 		BigDecimal totalChildAnno;
 		
@@ -411,16 +410,9 @@ public class DAGstructure {
 						annoCounter = nodeIndex[j].annotations.size()-childrenAnnotations.size();
                         if(annoCounter!=0)
 						{
-                        	//The following function (addVirtualChild) is not listed in report as it was scheduled for 
-                        	//removal, however I 
-                        	//have been unable to resolve resulting dependency issues from doing so, so it remains
-                        	//despite the fact that it adds no functionality to any calculations or alters any results
-                        	
-							//create virtual child
+                        	//account for virtual child/uncertainty
 							uniqueAnnotations = new BigDecimal(annoCounter);
-							transitionProb = uniqueAnnotations.divide(noAnnotations,5,BigDecimal.ROUND_FLOOR);
-							addVirtualChild(counter, namespace, transitionProb, currentNode.nodeValue, currentNode.incomingRelationshipType, currentNode.storageIndex);
-							counter++;
+							transitionProb = uniqueAnnotations.divide(noAnnotations,5,BigDecimal.ROUND_FLOOR);							
 						}
 						else
 						{
@@ -755,23 +747,6 @@ public class DAGstructure {
     	}
     	outputWriter.close();
     }
-    
-    //The following function is not listed in report as it was scheduled for removal, however I 
-  	//have been unable to resolve resulting dependency issues from doing so, so it remains
-  	//despite the fact that it adds no functionality to any calculations or alters any results
-  	
-    public void addVirtualChild(int counter, String ontology, BigDecimal transitionProb, String parentVal, String parentType, int parentIndex)
-	{
-		for(int j=0;j<noNodes;j++)
-		{
-			if(DAGedges[j].root==null)
-			{
-				DAGedges[j].addNode("virtualChild:"+counter, "virtual", ontology, -1, transitionProb);
-				DAGedges[j].addNode(parentVal, parentType, ontology, parentIndex);
-				break;
-			}
-		}
-	}
 	
 	public HashSet<DAGnode> getChildren(DAGnode parent)
 	{
@@ -833,19 +808,24 @@ public class DAGstructure {
 			}
 			//get the number of annotations on the same GO tree
 			HashSet<Integer> annoNumber = new HashSet<Integer>();
-				for(int i=0;i<noNodes;i++)
-				{
-					if(DAGedges[i].root!=null)
-					{	
-						if(DAGedges[i].root.namespace.equals(node1.namespace)==true)
+			for(int i=0;i<noNodes;i++)
+			{
+				if(DAGedges[i].root!=null)
+				{	
+					if(DAGedges[i].root.namespace.equals(node1.namespace)==true)
+					{
+						if(DAGedges[i].root.annotations.isEmpty()==false)
 						{
-							if(DAGedges[i].root.annotations.isEmpty()==false)
-							{
-								annoNumber.addAll(DAGedges[i].root.annotations);
-							}
+							annoNumber.addAll(DAGedges[i].root.annotations);
 						}
 					}
 				}
+			}
+			Definitions defs = new Definitions();
+			if(node1.nodeValue.equals(defs.getMFrootValue())==true||node2.nodeValue.equals(defs.getMFrootValue())==true||node1.nodeValue.equals(defs.getBProotValue())==true||node2.nodeValue.equals(defs.getBProotValue())==true||node1.nodeValue.equals(defs.getCCrootValue())==true||node2.nodeValue.equals(defs.getCCrootValue())==true)
+			{
+				LCAresult=annoNumber.size(); //if any of the nodes if a root of DAG, then entropy must be all/all
+			}
 			
 			BigDecimal LCAr = new BigDecimal(LCAresult);
 			BigDecimal noAnnotations = new BigDecimal(annoNumber.size());
@@ -869,19 +849,32 @@ public class DAGstructure {
 			double mValue = (2*Math.log(mtemp2.doubleValue())-Math.log(mtemp2.doubleValue())-Math.log(mtemp.doubleValue()));
 			jiangValue = (1-jiangValue)/mValue;
 		
-			Definitions defs = new Definitions();
 			//Lin
 			double linValueFinal;
-			if((node1.nodeValue.equals(defs.getBProotValue())==true&&node2.nodeValue.equals(defs.getBProotValue())==true)||(node1.nodeValue.equals(defs.getCCrootValue())==true&&node2.nodeValue.equals(defs.getCCrootValue())==true)||(node1.nodeValue.equals(defs.getMFrootValue())==true&&node2.nodeValue.equals(defs.getMFrootValue())==true))
+			if(LCAresult==annoNumber.size()||(node1entropy.doubleValue()==1&&node2entropy.doubleValue()==1))
 			{
-				linValueFinal=0; //if both nodes are the root, the lin equation will divide by 0, as this result is not important the end result is set to 0
+				linValueFinal=0;
 			}
 			else
 			{
-				double linValueTop = Math.log(probability.doubleValue());
-				linValueTop = linValueTop*2;//this is the top half of the equation (2logPmica(c1,c2)) now for the bottom:
-				double linValueBottom = Math.log(node1entropy.doubleValue())+Math.log(node2entropy.doubleValue());
-				linValueFinal = linValueTop/linValueBottom;
+				if((node1.nodeValue.equals(defs.getBProotValue())==true&&node2.nodeValue.equals(defs.getBProotValue())==true)||(node1.nodeValue.equals(defs.getCCrootValue())==true&&node2.nodeValue.equals(defs.getCCrootValue())==true)||(node1.nodeValue.equals(defs.getMFrootValue())==true&&node2.nodeValue.equals(defs.getMFrootValue())==true))
+				{
+					linValueFinal=0; //if both nodes are the root, the lin equation will divide by 0, as this result is not important the end result is set to 0
+				}
+				else
+				{
+					double linValueTop = Math.log(probability.doubleValue());
+					if(linValueTop==0)
+					{
+						linValueFinal =0;
+					}
+					else
+					{
+						linValueTop = linValueTop*2;//this is the top half of the equation (2logPmica(c1,c2)) now for the bottom:
+						double linValueBottom = Math.log(node1entropy.doubleValue())+Math.log(node2entropy.doubleValue());
+						linValueFinal = linValueTop/linValueBottom;
+					}
+				}
 			}
 			
 			//Resnik
@@ -930,6 +923,11 @@ public class DAGstructure {
 					}
 				}
 			}
+		}
+		Definitions defs = new Definitions();
+		if(node1.nodeValue.equals(defs.getMFrootValue())==true||node2.nodeValue.equals(defs.getMFrootValue())==true||node1.nodeValue.equals(defs.getBProotValue())==true||node2.nodeValue.equals(defs.getBProotValue())==true||node1.nodeValue.equals(defs.getCCrootValue())==true||node2.nodeValue.equals(defs.getCCrootValue())==true)
+		{
+			LCAresult=annoNumber.size(); //if any of the nodes if a root of DAG, then entropy must be all/all
 		}
 		
 		BigDecimal LCAr = new BigDecimal(LCAresult);
@@ -1063,6 +1061,11 @@ public class DAGstructure {
 				}
 			}
 		}
+		Definitions defs = new Definitions();
+		if(node1.nodeValue.equals(defs.getMFrootValue())==true||node2.nodeValue.equals(defs.getMFrootValue())==true||node1.nodeValue.equals(defs.getBProotValue())==true||node2.nodeValue.equals(defs.getBProotValue())==true||node1.nodeValue.equals(defs.getCCrootValue())==true||node2.nodeValue.equals(defs.getCCrootValue())==true)
+		{
+			LCAresult=annoNumber.size(); //if any of the nodes if a root of DAG, then entropy must be all/all
+		}
 		
 		BigDecimal LCAr = new BigDecimal(LCAresult);
 		BigDecimal noAnnotations = new BigDecimal(annoNumber.size());
@@ -1070,21 +1073,35 @@ public class DAGstructure {
 		probability = LCAr.divide(noAnnotations, 5, BigDecimal.ROUND_FLOOR); 
 		
 		double linValueFinal;
-		Definitions defs = new Definitions();
-		if((node1.nodeValue.equals(defs.getBProotValue())==true&&node2.nodeValue.equals(defs.getBProotValue())==true)||(node1.nodeValue.equals(defs.getCCrootValue())==true&&node2.nodeValue.equals(defs.getCCrootValue())==true)||(node1.nodeValue.equals(defs.getMFrootValue())==true&&node2.nodeValue.equals(defs.getMFrootValue())==true))
+		if(LCAresult==annoNumber.size())
 		{
-			linValueFinal=0; //if both nodes are the root, the lin equation will divide by 0, as this result is not important the end result is set to 0
+			linValueFinal=0;
 		}
 		else
 		{
-			double linValueTop = Math.log(probability.doubleValue());
-			linValueTop = linValueTop*2; //this is the top half of the equation (2logPmica(c1,c2)) now for the bottom:
-			BigDecimal node1entropy = new BigDecimal(node1.annotations.size());
-			BigDecimal node2entropy = new BigDecimal(node2.annotations.size());
-			node1entropy = node1entropy.divide(noAnnotations, 5, BigDecimal.ROUND_FLOOR);
-			node2entropy = node2entropy.divide(noAnnotations, 5, BigDecimal.ROUND_FLOOR);
-			double linValueBottom = Math.log(node1entropy.doubleValue())+Math.log(node2entropy.doubleValue());
-			linValueFinal = linValueTop/linValueBottom;
+			if((node1.nodeValue.equals(defs.getBProotValue())==true&&node2.nodeValue.equals(defs.getBProotValue())==true)||(node1.nodeValue.equals(defs.getCCrootValue())==true&&node2.nodeValue.equals(defs.getCCrootValue())==true)||(node1.nodeValue.equals(defs.getMFrootValue())==true&&node2.nodeValue.equals(defs.getMFrootValue())==true))
+			{
+				linValueFinal=0; //if both nodes are the root, the lin equation will divide by 0, as this result is not important the end result is set to 0
+			}
+			else
+			{
+				double linValueTop = Math.log(probability.doubleValue());
+				if(linValueTop==0)
+				{
+					linValueFinal=0;
+				}
+				linValueTop = linValueTop*2; //this is the top half of the equation (2logPmica(c1,c2)) now for the bottom:
+				BigDecimal node1entropy = new BigDecimal(node1.annotations.size());
+				BigDecimal node2entropy = new BigDecimal(node2.annotations.size());
+				node1entropy = node1entropy.divide(noAnnotations, 5, BigDecimal.ROUND_FLOOR);
+				node2entropy = node2entropy.divide(noAnnotations, 5, BigDecimal.ROUND_FLOOR);
+				if(node1entropy.doubleValue()==1&&node2entropy.doubleValue()==1)
+				{
+					linValueFinal=0;
+				}
+				double linValueBottom = Math.log(node1entropy.doubleValue())+Math.log(node2entropy.doubleValue());
+				linValueFinal = linValueTop/linValueBottom;
+			}
 		}
 		return new BigDecimal(linValueFinal);
 	}
@@ -1197,7 +1214,11 @@ public class DAGstructure {
 				}
 			}
 		}
-		
+		Definitions defs = new Definitions();
+		if(node1.nodeValue.equals(defs.getMFrootValue())==true||node2.nodeValue.equals(defs.getMFrootValue())==true||node1.nodeValue.equals(defs.getBProotValue())==true||node2.nodeValue.equals(defs.getBProotValue())==true||node1.nodeValue.equals(defs.getCCrootValue())==true||node2.nodeValue.equals(defs.getCCrootValue())==true)
+		{
+			LCAresult=annoNumber.size(); //if any of the nodes if a root of DAG, then entropy must be all/all
+		}
 		BigDecimal LCAr = new BigDecimal(LCAresult);
 		BigDecimal noAnnotations = new BigDecimal(annoNumber.size());
 		BigDecimal probability = new BigDecimal(0);

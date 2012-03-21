@@ -1,5 +1,3 @@
-import java.math.BigDecimal;
-
 public class linkList {
 	
 	public DAGnode root;
@@ -25,15 +23,6 @@ public class linkList {
 		{
 			root = new DAGnode(nodeValue, incomingRelationshipType, namespace, storageIndex);
 		}
-	}
-	//The following function is not listed in report as it was scheduled for removal, however I 
-	//have been unable to resolve resulting dependency issues from doing so, so it remains
-	//despite the fact that it adds no functionality to any calculations or alters any results
-		
-	//for virtual nodes
-	public void addNode(String val, String type, String nspace, int index, BigDecimal transitionProb)
-	{		
-		root = new DAGnode(val, type, nspace, index, transitionProb);//this is a self ref now as thats more useful //index = 0 as this is this nodes primary store (not as a relation)
 	}
 	
 	public void removeNode(String target)

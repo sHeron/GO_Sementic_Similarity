@@ -16,12 +16,10 @@ public class GOparser {
 			{
 				if(quickScan.next().equals("id:")==true)
 				{
-					//System.out.println("hit");
 					String nodeCheck = quickScan.next(); //outsource this declaration
 					if(nodeCheck.contains("GO:"))
 					{
 						noNodes++;
-						//System.out.println(noNodes);
 					}
 				}
 			}
